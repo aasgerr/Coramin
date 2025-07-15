@@ -15,6 +15,27 @@ you only need to inherit from _BlockData.
 # ToDo: Document this custom block code with an example
 '''
 
+def _resolve_metaclass(bases):
+    """Resolve metaclass conflicts by finding the most derived metaclass."""
+    metaclasses = [type(base) for base in bases]
+    # Remove duplicates while preserving order
+    unique_metaclasses = []
+    for mc in metaclasses:
+        if mc not in unique_metaclasses:
+            unique_metaclasses.append(mc)
+    
+    # Find the most derived metaclass
+    result = unique_metaclasses[0]
+    for mc in unique_metaclasses[1:]:
+        if issubclass(mc, result):
+            result = mc
+        elif not issubclass(result, mc):
+            # Create a new metaclass that inherits from both
+            class ResolvedMeta(result, mc):
+                pass
+            result = ResolvedMeta
+    return result
+
 class _IndexedCustomBlockMeta(type):
     """Metaclass for creating an indexed block with
     a custom block data type."""
@@ -23,6 +44,11 @@ class _IndexedCustomBlockMeta(type):
         def __init__(self, *args, **kwargs):
             bases[0].__init__(self, *args, **kwargs)
         dct["__init__"] = __init__
+        
+        # Resolve metaclass conflicts
+        resolved_meta = _resolve_metaclass(bases)
+        if resolved_meta != meta:
+            return resolved_meta(name, bases, dct)
         return type.__new__(meta, name, bases, dct)
 
 class _ScalarCustomBlockMeta(type):
@@ -37,6 +63,11 @@ class _ScalarCustomBlockMeta(type):
             # is used for declaration
             bases[1].__init__(self, *args, **kwargs)
         dct["__init__"] = __init__
+        
+        # Resolve metaclass conflicts
+        resolved_meta = _resolve_metaclass(bases)
+        if resolved_meta != meta:
+            return resolved_meta(name, bases, dct)
         return type.__new__(meta, name, bases, dct)
 
 class CustomBlock(Block):
